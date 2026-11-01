@@ -16,8 +16,8 @@ function buatCsp(nonce) {
     // Tailwind memakai file CSS sendiri; Google Fonts dipakai di layout.
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    // Foto produk berasal dari folder public/ (atau data: untuk ikon kecil).
-    "img-src 'self' data: blob:",
+    // Foto produk dari folder public/, atau dari alamat https yang diisi admin di form produk.
+    "img-src 'self' data: blob: https:",
     // Browser hanya boleh menghubungi server sendiri, tidak boleh ke supabase.co.
     "connect-src 'self'",
     "object-src 'none'",

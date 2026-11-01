@@ -2,8 +2,30 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cekBatas, resetBatas, teksTunggu } from "@/lib/rate-limit";
+import { validasiProduk, idProduk } from "@/lib/validasi-produk";
+
+// Setiap aksi yang mengubah data wajib memanggil ini lebih dulu.
+// Mengembalikan koneksi sesi admin (RLS tetap berlaku) atau null kalau belum login.
+async function ambilSesiAdmin() {
+  try {
+    const supabase = await createAdminClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !user) return null;
+    return { supabase, user };
+  } catch {
+    return null;
+  }
+}
+
+const PESAN_BELUM_LOGIN = "Anda harus login terlebih dahulu.";
+const PESAN_GAGAL_SIMPAN = "Gagal menyimpan produk. Coba lagi beberapa saat lagi.";
 
 async function ambilIp() {
   const daftarHeader = await headers();
@@ -122,4 +144,113 @@ export async function gantiPassword(prevState, formData) {
   } catch {
     return { error: "Terjadi kesalahan saat mengganti password. Coba lagi beberapa saat lagi." };
   }
+}
+
+// US-08: tambah produk.
+export async function tambahProduk(prevState, formData) {
+  const sesi = await ambilSesiAdmin();
+  if (!sesi) {
+    return { error: PESAN_BELUM_LOGIN };
+  }
+
+  const { nilai, data, error: pesanValidasi } = validasiProduk(formData);
+  if (pesanValidasi) {
+    return { error: pesanValidasi, nilai };
+  }
+
+  try {
+    const { error } = await sesi.supabase.from("produk").insert(data);
+
+    if (error) {
+      console.error("Gagal menambah produk, kode:", error.code ?? "tidak-diketahui");
+      return { error: PESAN_GAGAL_SIMPAN, nilai };
+    }
+  } catch (err) {
+    console.error("Gagal menambah produk, jenis error:", err?.name ?? "tidak-diketahui");
+    return { error: PESAN_GAGAL_SIMPAN, nilai };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+// US-09: ubah produk. `id` diisi lewat bind() di halaman, lalu diperiksa ulang di sini.
+export async function ubahProduk(id, prevState, formData) {
+  const sesi = await ambilSesiAdmin();
+  if (!sesi) {
+    return { error: PESAN_BELUM_LOGIN };
+  }
+
+  const idValid = idProduk(id);
+  if (!idValid) {
+    return { error: "Produk tidak ditemukan." };
+  }
+
+  const { nilai, data, error: pesanValidasi } = validasiProduk(formData);
+  if (pesanValidasi) {
+    return { error: pesanValidasi, nilai };
+  }
+
+  try {
+    // select("id") supaya ketahuan kalau tidak ada baris yang berubah (id salah atau sudah dihapus).
+    const { data: terubah, error } = await sesi.supabase
+      .from("produk")
+      .update(data)
+      .eq("id", idValid)
+      .select("id");
+
+    if (error) {
+      console.error("Gagal mengubah produk, kode:", error.code ?? "tidak-diketahui");
+      return { error: PESAN_GAGAL_SIMPAN, nilai };
+    }
+    if (!terubah || terubah.length === 0) {
+      return { error: "Produk tidak ditemukan atau sudah dihapus.", nilai };
+    }
+  } catch (err) {
+    console.error("Gagal mengubah produk, jenis error:", err?.name ?? "tidak-diketahui");
+    return { error: PESAN_GAGAL_SIMPAN, nilai };
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/produk/${idValid}`);
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+// US-10: hapus produk. Konfirmasi ditanyakan di browser (components/TombolHapus.jsx);
+// pemeriksaan login yang sebenarnya tetap di sini, di server.
+export async function hapusProduk(prevState, formData) {
+  const sesi = await ambilSesiAdmin();
+  if (!sesi) {
+    return { error: PESAN_BELUM_LOGIN };
+  }
+
+  const id = idProduk(formData?.get?.("id"));
+  if (!id) {
+    return { error: "Produk tidak ditemukan." };
+  }
+
+  try {
+    const { data: terhapus, error } = await sesi.supabase
+      .from("produk")
+      .delete()
+      .eq("id", id)
+      .select("id");
+
+    if (error) {
+      console.error("Gagal menghapus produk, kode:", error.code ?? "tidak-diketahui");
+      return { error: "Gagal menghapus produk. Coba lagi beberapa saat lagi." };
+    }
+    if (!terhapus || terhapus.length === 0) {
+      return { error: "Produk tidak ditemukan atau sudah dihapus." };
+    }
+  } catch (err) {
+    console.error("Gagal menghapus produk, jenis error:", err?.name ?? "tidak-diketahui");
+    return { error: "Gagal menghapus produk. Coba lagi beberapa saat lagi." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  return { success: "Produk dihapus." };
 }
