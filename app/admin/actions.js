@@ -1,7 +1,16 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cekBatas, resetBatas, teksTunggu } from "@/lib/rate-limit";
+
+async function ambilIp() {
+  const daftarHeader = await headers();
+  const diteruskan = daftarHeader.get("x-forwarded-for");
+  if (diteruskan) return diteruskan.split(",")[0].trim();
+  return daftarHeader.get("x-real-ip") || "tidak-dikenal";
+}
 
 export async function login(prevState, formData) {
   const data = formData instanceof FormData ? formData : prevState;
@@ -10,6 +19,18 @@ export async function login(prevState, formData) {
 
   if (!email || !password) {
     return { error: "Email dan password wajib diisi." };
+  }
+
+  // K-12: batasi percobaan login. Per alamat IP + email (5x) dan per IP saja (20x)
+  // dalam 15 menit.
+  const ip = await ambilIp();
+  const kunciEmail = `login:${ip}:${email.toLowerCase()}`;
+  const kunciIp = `login-ip:${ip}`;
+
+  const batasEmail = cekBatas(kunciEmail, { maks: 5 });
+  const batasIp = cekBatas(kunciIp, { maks: 20 });
+  if (!batasEmail.diizinkan || !batasIp.diizinkan) {
+    return { error: teksTunggu(Math.max(batasEmail.tungguDetik ?? 0, batasIp.tungguDetik ?? 0)) };
   }
 
   let errorToReturn = null;
@@ -21,19 +42,21 @@ export async function login(prevState, formData) {
     });
 
     if (error) {
+      // K-9: jangan teruskan pesan mentah dari Supabase ke pengunjung.
       errorToReturn =
-        error.message === "Invalid login credentials"
+        error.code === "invalid_credentials" || error.message === "Invalid login credentials"
           ? "Email atau password salah."
-          : error.message;
+          : "Login gagal. Coba lagi beberapa saat lagi.";
     }
-  } catch (err) {
-    errorToReturn = err.message || "Terjadi kesalahan saat memproses login.";
+  } catch {
+    errorToReturn = "Terjadi kesalahan saat memproses login. Coba lagi beberapa saat lagi.";
   }
 
   if (errorToReturn) {
     return { error: errorToReturn };
   }
 
+  resetBatas(kunciEmail);
   redirect("/admin");
 }
 
@@ -74,16 +97,29 @@ export async function gantiPassword(prevState, formData) {
       return { error: "Anda harus login terlebih dahulu." };
     }
 
+    // K-12: batasi ganti password, 5x per 15 menit per akun.
+    const batas = cekBatas(`password:${user.id}`, { maks: 5 });
+    if (!batas.diizinkan) {
+      return { error: teksTunggu(batas.tungguDetik) };
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({
       password: passwordBaru,
     });
 
     if (updateError) {
-      return { error: updateError.message };
+      // K-9: pesan dibuat sendiri, bukan diteruskan mentah dari Supabase.
+      if (updateError.code === "same_password") {
+        return { error: "Password baru harus berbeda dari password lama." };
+      }
+      if (updateError.code === "weak_password") {
+        return { error: "Password terlalu lemah. Gunakan kombinasi yang lebih panjang." };
+      }
+      return { error: "Gagal mengganti password. Coba lagi beberapa saat lagi." };
     }
 
     return { success: "Password berhasil diganti." };
-  } catch (err) {
-    return { error: err.message || "Terjadi kesalahan saat mengganti password." };
+  } catch {
+    return { error: "Terjadi kesalahan saat mengganti password. Coba lagi beberapa saat lagi." };
   }
 }

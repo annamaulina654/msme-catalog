@@ -1,4 +1,5 @@
 import "./globals.css";
+import { connection } from "next/server";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { toko } from "@/lib/toko";
@@ -8,7 +9,11 @@ export const metadata = {
   description: toko.tagline,
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // K-11: CSP memakai nonce yang berbeda di setiap permintaan, jadi semua halaman
+  // harus dirender saat diminta (bukan dibuat statis saat build).
+  await connection();
+
   return (
     <html lang="id">
       <head>

@@ -16,12 +16,15 @@ export default async function HalamanKatalog() {
       .order("id", { ascending: true });
 
     if (error) {
-      pesanError = error.message;
+      // K-9 dan K-13: catat hanya kode error di log server, jangan tampilkan detail ke pengunjung.
+      console.error("Gagal memuat produk, kode:", error.code ?? "tidak-diketahui");
+      pesanError = "Produk belum bisa dimuat. Silakan coba lagi beberapa saat lagi.";
     } else {
       daftarProduk = data || [];
     }
   } catch (err) {
-    pesanError = err.message || "Terjadi kesalahan saat memuat data produk.";
+    console.error("Gagal memuat produk, jenis error:", err?.name ?? "tidak-diketahui");
+    pesanError = "Produk belum bisa dimuat. Silakan coba lagi beberapa saat lagi.";
   }
 
   return (
@@ -41,7 +44,7 @@ export default async function HalamanKatalog() {
 
         {pesanError ? (
           <div className="rounded-xl border border-garis bg-permukaan p-6 text-center text-bahaya">
-            Gagal mengambil data produk: {pesanError}
+            {pesanError}
           </div>
         ) : daftarProduk.length === 0 ? (
           <p className="py-12 text-center text-teks-lembut">Belum ada produk</p>
