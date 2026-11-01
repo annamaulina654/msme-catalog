@@ -15,11 +15,39 @@
 
   --color-utama: #1f6b4f;
   --color-utama-gelap: #154d39;
+  /* Warna untuk teks dan tautan hijau. Di mode terang sama dengan utama. */
+  --color-tautan: #1f6b4f;
 
   --color-harga: #7a4e09;
   --color-harga-latar: #fbefd8;
 
   --color-bahaya: #b42318;
+}
+
+/*
+  US-25: mode gelap. Atribut data-tema diatur oleh public/tema.js (saat halaman
+  dimuat) dan components/TombolTema.jsx (saat tombol diklik).
+  Rasio kontras setiap pasangan warna sudah dihitung minimal 4,5:1.
+*/
+html[data-tema="gelap"] {
+  color-scheme: dark;
+
+  --color-latar: #101612;
+  --color-permukaan: #19211c;
+  --color-garis: #2f3d35;
+  --color-teks: #e9f0ec;
+  --color-teks-lembut: #a8b8af;
+
+  /* Latar tombol hijau (teks putih di atasnya) */
+  --color-utama: #2a8562;
+  --color-utama-gelap: #206a4e;
+  /* Teks dan tautan hijau di atas latar gelap */
+  --color-tautan: #5fcf9f;
+
+  --color-harga: #f3c77a;
+  --color-harga-latar: #3a2b0e;
+
+  --color-bahaya: #ff8a80;
 }
 
 html {
@@ -28,6 +56,6 @@ html {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-utama);
+  outline: 3px solid var(--color-tautan);
   outline-offset: 2px;
 }

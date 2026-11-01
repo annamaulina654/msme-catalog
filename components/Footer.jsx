@@ -10,7 +10,7 @@ export default function Footer() {
           <p>{toko.alamat}</p>
           <p>{toko.jamBuka}</p>
         </div>
-        <Link href="/admin" className="self-start underline underline-offset-4 hover:text-utama">
+        <Link href="/admin" className="self-start underline underline-offset-4 hover:text-tautan">
           Masuk sebagai admin
         </Link>
       </div>

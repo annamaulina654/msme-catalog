@@ -26,7 +26,7 @@ export default function HalamanGantiPassword() {
       )}
 
       {state?.success && (
-        <div className="max-w-sm rounded-lg border border-garis bg-permukaan p-3 text-sm font-medium text-utama">
+        <div className="max-w-sm rounded-lg border border-garis bg-permukaan p-3 text-sm font-medium text-tautan">
           {state.success}
         </div>
       )}

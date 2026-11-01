@@ -4,10 +4,10 @@ import { logout } from "@/app/admin/actions";
 export default function NavAdmin() {
   return (
     <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-garis pb-4 text-sm">
-      <Link href="/admin" className="font-semibold hover:text-utama">
+      <Link href="/admin" className="font-semibold hover:text-tautan">
         Produk
       </Link>
-      <Link href="/admin/password" className="font-semibold hover:text-utama">
+      <Link href="/admin/password" className="font-semibold hover:text-tautan">
         Ganti password
       </Link>
       <form action={logout} className="ml-auto">
