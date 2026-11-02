@@ -77,4 +77,22 @@ Urutan yang disarankan: US-01, US-02, US-03, US-04, US-05, US-06, lalu fitur bon
 - **Nama usaha:** Rumah Oleh-Oleh Madura
 - **Pembuat:** Anna Maulina
 - **Link aplikasi:** https://msme-catalog.vercel.app/
-- **Fitur bonus yang dikerjakan:**
+
+### Fitur bonus yang dikerjakan
+
+- Katalog produk dengan pencarian dan filter kategori.
+- Pengurutan produk berdasarkan harga dan waktu penambahan.
+- Pagination katalog.
+- Halaman detail produk.
+- Favorit dan produk terakhir dilihat.
+- Perbandingan produk.
+- Keranjang belanja dan pemesanan melalui WhatsApp.
+- Mode gelap.
+- PWA.
+- Pengelolaan produk melalui halaman admin.
+- Upload foto produk ke Supabase Storage.
+- Pengelolaan kategori.
+- Impor dan ekspor produk melalui CSV.
+- Dashboard admin.
+- Ulasan dan rating produk.
+- Asisten AI untuk membantu pengunjung memahami produk.
