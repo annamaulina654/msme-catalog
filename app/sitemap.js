@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { urlSitus } from "@/lib/situs";
 
-// US-27: sitemap.xml dibuat dari database setiap kali diminta, jadi produk dan kategori baru
-// langsung masuk tanpa perlu deploy ulang. Produk nonaktif tidak ikut.
+// US-27: sitemap.xml dibuat dari database setiap kali diminta, jadi produk baru
+// langsung masuk tanpa perlu deploy ulang. Produk nonaktif tidak ikut (US-32).
 export const dynamic = "force-dynamic";
 
 export default async function sitemap() {
@@ -16,7 +16,7 @@ export default async function sitemap() {
     const supabase = createClient();
     const [produk, kategori] = await Promise.all([
       supabase.from("produk").select("id, created_at").eq("aktif", true).order("id", { ascending: true }),
-      supabase.from("kategori").select("slug").order("slug", { ascending: true }),
+      supabase.from("kategori").select("slug").order("nama", { ascending: true }),
     ]);
 
     if (produk.error) {
@@ -30,7 +30,6 @@ export default async function sitemap() {
         priority: 0.8,
       });
     }
-
     for (const k of kategori.data ?? []) {
       daftar.push({ url: `${dasar}/kategori/${k.slug}`, changeFrequency: "weekly", priority: 0.6 });
     }

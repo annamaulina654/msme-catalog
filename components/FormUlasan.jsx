@@ -1,24 +1,19 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState } from "react";
 import Input from "@/components/Input";
 import Tombol from "@/components/Tombol";
 import { kirimUlasan } from "@/app/aksi-publik";
 
-// US-38: form ulasan (nama, rating 1 sampai 5, komentar). `produkId` disisipkan lewat bind().
+// US-38: form ulasan. Kolom "website" adalah honeypot: tersembunyi untuk manusia, diisi oleh bot.
 export default function FormUlasan({ produkId }) {
   const [state, formAction, isPending] = useActionState(kirimUlasan.bind(null, produkId), null);
-  const formRef = useRef(null);
   const errors = state?.errors ?? {};
   const nilai = state?.nilai ?? {};
 
-  // Kosongkan form setelah ulasan berhasil terkirim.
-  useEffect(() => {
-    if (state?.success) formRef.current?.reset();
-  }, [state]);
-
+  // Setelah berhasil, form dimuat ulang dalam keadaan kosong.
   return (
-    <form ref={formRef} action={formAction} className="flex max-w-xl flex-col gap-4">
+    <form key={state?.success ? "selesai" : "isi"} action={formAction} className="flex max-w-xl flex-col gap-3">
       {state?.error && (
         <div role="alert" className="rounded-lg border border-garis bg-permukaan p-3 text-sm text-bahaya">
           {state.error}
@@ -30,22 +25,28 @@ export default function FormUlasan({ produkId }) {
         </div>
       )}
 
-      <Input label="Nama" name="nama" defaultValue={nilai.nama ?? ""} maxLength={50} required error={errors.nama} />
+      <Input label="Nama Anda" name="nama" defaultValue={nilai.nama ?? ""} maxLength={50} required error={errors.nama} />
 
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-sm font-semibold">Rating</legend>
-        <div className="flex flex-wrap gap-2">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <label key={n} className="cursor-pointer text-sm font-semibold">
-              <input type="radio" name="rating" value={n} defaultChecked={nilai.rating === String(n)} required className="peer sr-only" />
-              <span className="inline-flex h-10 min-w-12 items-center justify-center rounded-lg border border-garis px-3 peer-checked:border-utama peer-checked:bg-utama peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-2">
-                {n} ★
-              </span>
-            </label>
+      <label className="flex flex-col gap-1.5 text-sm font-semibold">
+        Rating
+        <select
+          name="rating"
+          defaultValue={nilai.rating ?? ""}
+          required
+          className={`w-full rounded-lg border ${errors.rating ? "border-bahaya" : "border-garis"} bg-latar px-3 py-2.5 text-base text-teks focus:border-utama focus:outline-none`}
+        >
+          <option value="" disabled>
+            Pilih rating
+          </option>
+          {[5, 4, 3, 2, 1].map((n) => (
+            <option key={n} value={n}>
+              {"★".repeat(n)}
+              {"☆".repeat(5 - n)} ({n})
+            </option>
           ))}
-        </div>
-        {errors.rating && <span className="text-sm text-bahaya">{errors.rating}</span>}
-      </fieldset>
+        </select>
+        {errors.rating && <span className="text-sm font-normal text-bahaya">{errors.rating}</span>}
+      </label>
 
       <Input
         label="Komentar (5 sampai 500 karakter)"
@@ -57,10 +58,10 @@ export default function FormUlasan({ produkId }) {
         error={errors.komentar}
       />
 
-      {/* Honeypot: disembunyikan dari pengunjung. Bot yang mengisinya akan diabaikan. */}
+      {/* Honeypot: jangan diisi. Disembunyikan dari tampilan dan pembaca layar. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
         <label>
-          Jangan diisi
+          Jangan isi kolom ini
           <input type="text" name="website" tabIndex={-1} autoComplete="off" />
         </label>
       </div>

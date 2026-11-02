@@ -3,7 +3,7 @@ import BannerPromo from "@/components/BannerPromo";
 import DaftarProduk from "@/components/DaftarProduk";
 import FilterKatalog from "@/components/FilterKatalog";
 import Paginasi from "@/components/Paginasi";
-import TerakhirDilihat from "@/components/TerakhirDilihat";
+import TerakhirDilihat from "@/components/DaftarTersimpan";
 import { ambilBannerAktif, ambilKategori, bacaParameter, cariProduk } from "@/lib/katalog";
 import { ambilPengaturan } from "@/lib/pengaturan";
 

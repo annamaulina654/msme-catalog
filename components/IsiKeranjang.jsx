@@ -1,32 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { muatProduk } from "@/app/aksi-publik";
 import Tombol from "@/components/Tombol";
 import { formatRupiah } from "@/lib/format";
+import { hargaAkhir, stokHabis } from "@/lib/harga";
 import { linkWhatsApp, pesanKeranjang } from "@/lib/pesan-wa";
-import { bacaKeranjang, sama, tulisDaftar, useDaftarLokal } from "@/lib/lokal";
-import { catatKlikWa, rincianKeranjang } from "@/app/aksi-publik";
+import { KUNCI, MAKS_JUMLAH, tulisDaftar, useDaftarTersimpan } from "@/components/penyimpanan";
 
-// US-21: keranjang. Isinya (id, varian, jumlah) disimpan di browser; nama dan harga selalu diambil
-// ulang dari server supaya total benar walau harga berubah.
-export default function IsiKeranjang({ nomor }) {
-  const isi = useDaftarLokal("keranjang", bacaKeranjang);
-  const [rincian, setRincian] = useState(null);
+// US-21: keranjang. Browser hanya menyimpan id, varian, dan jumlah. Nama, harga, dan stok diambil segar dari
+// server setiap kali halaman dibuka, jadi harga yang dikirim ke WhatsApp selalu harga terbaru.
+export default function IsiKeranjang({ nomorWa }) {
+  const [tersimpan] = useDaftarTersimpan(KUNCI.keranjang);
+  const [produk, setProduk] = useState(null);
   const [gagal, setGagal] = useState(false);
-  const kunci = useMemo(() => (isi ? isi.map((x) => `${x.id}:${x.varianId ?? 0}`).join(",") : null), [isi]);
+
+  const kunciId = useMemo(() => (tersimpan ?? []).map((x) => x.id).join(","), [tersimpan]);
 
   useEffect(() => {
-    if (isi === null) return undefined;
-    if (isi.length === 0) {
-      setRincian([]);
-      return undefined;
+    if (tersimpan === null) return;
+    const ids = [...new Set(tersimpan.map((x) => x.id))];
+    if (ids.length === 0) {
+      setProduk([]);
+      return;
     }
     let batal = false;
-    setGagal(false);
-    rincianKeranjang(isi)
+    muatProduk(ids)
       .then((hasil) => {
-        if (!batal) setRincian(hasil.item);
+        if (!batal) {
+          setProduk(hasil);
+          setGagal(false);
+        }
       })
       .catch(() => {
         if (!batal) setGagal(true);
@@ -34,64 +39,45 @@ export default function IsiKeranjang({ nomor }) {
     return () => {
       batal = true;
     };
-    // Hanya diambil ulang kalau susunan barang berubah, bukan saat jumlah berubah.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kunci]);
+    // Hanya dimuat ulang saat daftar produk di keranjang berubah, bukan saat jumlah berubah.
+  }, [kunciId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const baris = useMemo(() => {
-    if (!isi || !rincian) return [];
-    return isi
-      .map((x) => {
-        const r = rincian.find((y) => sama(y, x));
-        return r ? { ...r, jumlah: x.jumlah } : null;
-      })
-      .filter(Boolean);
-  }, [isi, rincian]);
-
-  // Barang yang sudah tidak ada atau nonaktif dibuang dari keranjang.
-  useEffect(() => {
-    if (!isi || !rincian || isi.length === 0) return;
-    const masihAda = isi.filter((x) => rincian.some((y) => sama(y, x)));
-    if (masihAda.length !== isi.length) tulisDaftar("keranjang", masihAda);
-  }, [isi, rincian]);
-
-  const adaHabis = baris.some((b) => b.habis);
-  const bisaDipesan = baris.filter((b) => !b.habis);
-  const total = bisaDipesan.reduce((n, b) => n + b.harga * b.jumlah, 0);
-
-  function ubahJumlah(item, jumlahBaru) {
-    const maks = typeof item.stok === "number" && item.stok > 0 ? Math.min(99, item.stok) : 99;
-    const jumlah = Math.min(maks, Math.max(1, jumlahBaru));
-    tulisDaftar(
-      "keranjang",
-      bacaKeranjang().map((x) => (sama(x, item) ? { ...x, jumlah } : x))
-    );
+  if (tersimpan === null || (produk === null && !gagal)) {
+    return <p className="py-8 text-teks-lembut">Memuat keranjang...</p>;
   }
-
-  function hapus(item) {
-    tulisDaftar(
-      "keranjang",
-      bacaKeranjang().filter((x) => !sama(x, item))
-    );
-  }
-
-  function kosongkan() {
-    tulisDaftar("keranjang", []);
-  }
-
-  if (isi === null || (isi.length > 0 && rincian === null && !gagal)) {
-    return <p className="py-12 text-center text-teks-lembut">Memuat keranjang...</p>;
-  }
-
   if (gagal) {
-    return (
-      <div className="rounded-xl border border-garis bg-permukaan p-6 text-center text-bahaya">
-        Keranjang belum bisa dimuat. Muat ulang halaman ini.
-      </div>
-    );
+    return <p className="py-8 text-bahaya">Keranjang belum bisa dimuat. Silakan muat ulang halaman.</p>;
   }
 
-  if (baris.length === 0) {
+  const peta = new Map((produk ?? []).map((p) => [p.id, p]));
+
+  // Gabungkan isi keranjang dengan data terbaru. Item yang produknya sudah tidak ada ditandai.
+  const baris = tersimpan.map((item) => {
+    const p = peta.get(item.id);
+    if (!p) return { item, hilang: true };
+    const v = item.varian ? p.varian.find((x) => x.id === item.varian) : null;
+    const tidakAda = item.varian && !v; // varian sudah dihapus
+    const harga = v ? v.harga : hargaAkhir(p);
+    return { item, p, v, harga, habis: stokHabis(p) || Boolean(tidakAda), hilang: false };
+  });
+
+  const bisaDipesan = baris.filter((b) => !b.hilang && !b.habis);
+  const total = bisaDipesan.reduce((n, b) => n + b.harga * b.item.jumlah, 0);
+
+  function simpanBaru(daftarBaru) {
+    tulisDaftar(KUNCI.keranjang, daftarBaru);
+  }
+  const sama = (a, b) => a.id === b.id && (a.varian ?? null) === (b.varian ?? null);
+
+  function ubahJumlah(item, jumlah) {
+    const baru = Math.min(MAKS_JUMLAH, Math.max(1, jumlah));
+    simpanBaru(tersimpan.map((x) => (sama(x, item) ? { ...x, jumlah: baru } : x)));
+  }
+  function hapus(item) {
+    simpanBaru(tersimpan.filter((x) => !sama(x, item)));
+  }
+
+  if (tersimpan.length === 0) {
     return (
       <div className="flex flex-col items-start gap-4 py-8">
         <p className="text-teks-lembut">Keranjang masih kosong.</p>
@@ -101,84 +87,107 @@ export default function IsiKeranjang({ nomor }) {
   }
 
   const pesan = pesanKeranjang(
-    bisaDipesan.map((b) => ({ nama: b.nama, varian: b.varianNama, jumlah: b.jumlah, harga: b.harga }))
+    bisaDipesan.map((b) => ({
+      nama: b.p.nama,
+      varian: b.v?.nama ?? null,
+      jumlah: b.item.jumlah,
+      harga: b.harga,
+    }))
   );
 
   return (
-    <div className="flex max-w-3xl flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <ul className="flex flex-col divide-y divide-garis rounded-2xl border border-garis">
         {baris.map((b) => (
-          <li key={`${b.id}:${b.varianId ?? 0}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-            <img src={b.foto_url} alt="" className={`h-16 w-16 rounded-lg object-cover ${b.habis ? "opacity-50" : ""}`} />
-            <div className="flex-1">
-              <Link href={`/produk/${b.id}`} className="font-semibold hover:text-tautan">
-                {b.nama}
-              </Link>
-              {b.varianNama && <p className="text-sm text-teks-lembut">{b.varianNama}</p>}
-              <p className="text-sm text-teks-lembut">
-                {formatRupiah(b.harga)}
-                {b.habis && <span className="ml-2 font-semibold text-bahaya">Stok habis, tidak ikut dipesan</span>}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+          <li key={`${b.item.id}-${b.item.varian ?? 0}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            {b.hilang ? (
+              <p className="flex-1 text-sm text-teks-lembut">Produk ini sudah tidak tersedia.</p>
+            ) : (
+              <div className="flex flex-1 items-center gap-3">
+                <img src={b.p.foto_url} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                <div>
+                  <Link href={`/produk/${b.p.id}`} className="font-semibold hover:text-tautan">
+                    {b.p.nama}
+                  </Link>
+                  {b.v && <p className="text-sm text-teks-lembut">{b.v.nama}</p>}
+                  <p className="text-sm text-teks-lembut">
+                    {formatRupiah(b.harga)}
+                    {b.habis && <span className="ml-2 font-semibold text-bahaya">Stok habis, tidak ikut dipesan</span>}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              {!b.hilang && (
+                <div className="flex items-center gap-1" role="group" aria-label="Jumlah">
+                  <button
+                    type="button"
+                    onClick={() => ubahJumlah(b.item, b.item.jumlah - 1)}
+                    disabled={b.item.jumlah <= 1}
+                    aria-label="Kurangi jumlah"
+                    className="h-9 w-9 rounded-lg border border-garis font-bold hover:border-utama disabled:opacity-40"
+                  >
+                    -
+                  </button>
+                  <span className="w-8 text-center font-semibold" aria-live="polite">
+                    {b.item.jumlah}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => ubahJumlah(b.item, b.item.jumlah + 1)}
+                    disabled={b.item.jumlah >= MAKS_JUMLAH}
+                    aria-label="Tambah jumlah"
+                    className="h-9 w-9 rounded-lg border border-garis font-bold hover:border-utama disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+              {!b.hilang && !b.habis && (
+                <p className="w-28 text-right font-bold">{formatRupiah(b.harga * b.item.jumlah)}</p>
+              )}
               <button
                 type="button"
-                onClick={() => ubahJumlah(b, b.jumlah - 1)}
-                disabled={b.jumlah <= 1}
-                aria-label={`Kurangi jumlah ${b.nama}`}
-                className="h-9 w-9 rounded-lg border border-garis font-bold disabled:opacity-40"
+                onClick={() => hapus(b.item)}
+                className="text-sm text-teks-lembut underline underline-offset-4 hover:text-bahaya"
               >
-                −
-              </button>
-              <span className="w-8 text-center font-semibold" aria-live="polite">
-                {b.jumlah}
-              </span>
-              <button
-                type="button"
-                onClick={() => ubahJumlah(b, b.jumlah + 1)}
-                aria-label={`Tambah jumlah ${b.nama}`}
-                className="h-9 w-9 rounded-lg border border-garis font-bold"
-              >
-                +
+                Hapus
               </button>
             </div>
-            <p className="w-28 text-right font-semibold">{formatRupiah(b.harga * b.jumlah)}</p>
-            <button
-              type="button"
-              onClick={() => hapus(b)}
-              className="text-sm text-teks-lembut underline underline-offset-4 hover:text-bahaya"
-              aria-label={`Hapus ${b.nama} dari keranjang`}
-            >
-              Hapus
-            </button>
           </li>
         ))}
       </ul>
 
-      <div className="flex items-center justify-between rounded-2xl border border-garis bg-permukaan p-4">
-        <span className="font-semibold">Total{adaHabis ? " (tanpa barang yang habis)" : ""}</span>
-        <span className="text-2xl font-extrabold">{formatRupiah(total)}</span>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row">
-        {bisaDipesan.length > 0 ? (
-          <a
-            href={linkWhatsApp(nomor, pesan)}
-            target="_blank"
-            rel="noopener noreferrer"
+      <div className="flex flex-col gap-4 rounded-2xl border border-garis bg-permukaan p-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-lg">
+          Total <span className="font-extrabold">{formatRupiah(total)}</span>
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
             onClick={() => {
-              catatKlikWa(bisaDipesan.map((b) => b.id)).catch(() => {});
+              if (window.confirm("Kosongkan seluruh keranjang?")) simpanBaru([]);
             }}
-            className="inline-flex items-center justify-center rounded-lg bg-utama px-5 py-3 font-semibold text-white hover:bg-utama-gelap"
+            className="rounded-lg border border-garis px-4 py-2.5 text-sm font-semibold hover:border-bahaya hover:text-bahaya"
           >
-            Pesan semua via WhatsApp
-          </a>
-        ) : (
-          <p className="text-sm text-bahaya">Semua barang di keranjang sedang habis.</p>
-        )}
-        <Tombol type="button" varian="garis" onClick={kosongkan}>
-          Kosongkan keranjang
-        </Tombol>
+            Kosongkan
+          </button>
+          {bisaDipesan.length > 0 ? (
+            <a
+              href={linkWhatsApp(nomorWa, pesan)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-lg bg-utama px-5 py-2.5 font-semibold text-white hover:bg-utama-gelap"
+            >
+              Pesan semua via WhatsApp
+            </a>
+          ) : (
+            <span className="inline-flex items-center rounded-lg border border-garis px-5 py-2.5 font-semibold text-teks-lembut">
+              Tidak ada barang yang bisa dipesan
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,21 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { bacaKeranjang, useDaftarLokal } from "@/lib/lokal";
+import { KUNCI, useDaftarTersimpan } from "@/components/penyimpanan";
 
-// US-21: tautan keranjang di header dengan jumlah barang.
+// US-21: tautan ke keranjang dengan jumlah barang. Angka dibaca dari browser setelah halaman termuat.
 export default function IkonKeranjang() {
-  const isi = useDaftarLokal("keranjang", bacaKeranjang);
-  const jumlah = (isi ?? []).reduce((n, x) => n + x.jumlah, 0);
+  const [daftar] = useDaftarTersimpan(KUNCI.keranjang);
+  const jumlah = (daftar ?? []).reduce((n, x) => n + (Number(x.jumlah) || 0), 0);
 
   return (
-    <Link href="/keranjang" className="font-semibold hover:text-tautan">
-      Keranjang
-      {jumlah > 0 && (
-        <span className="ml-1.5 rounded-full bg-utama px-2 py-0.5 text-xs text-white" aria-label={`${jumlah} barang`}>
-          {jumlah}
-        </span>
-      )}
+    <Link href="/keranjang" className="font-semibold hover:text-tautan" aria-label={`Keranjang, ${jumlah} barang`}>
+      Keranjang{jumlah > 0 ? ` (${jumlah})` : ""}
     </Link>
   );
 }
