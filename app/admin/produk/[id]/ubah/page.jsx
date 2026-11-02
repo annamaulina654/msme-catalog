@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import NavAdmin from "@/components/NavAdmin";
 import FormProduk from "@/components/FormProduk";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ambilDaftarKategoriAdmin } from "@/lib/sesi-admin";
 import { idProduk } from "@/lib/validasi-produk";
 import { ubahProduk } from "@/app/admin/actions";
 
@@ -17,6 +18,7 @@ export default async function HalamanUbahProduk({ params }) {
   }
 
   let produk = null;
+  let daftarKategori = [];
   try {
     const supabase = await createAdminClient();
     const { data, error } = await supabase
@@ -30,6 +32,7 @@ export default async function HalamanUbahProduk({ params }) {
     } else {
       produk = data;
     }
+    daftarKategori = await ambilDaftarKategoriAdmin(supabase);
   } catch (err) {
     console.error("Gagal memuat produk untuk diubah, jenis error:", err?.name ?? "tidak-diketahui");
   }
@@ -45,7 +48,12 @@ export default async function HalamanUbahProduk({ params }) {
     <div className="flex flex-col gap-6 py-8">
       <NavAdmin />
       <h1 className="text-2xl font-extrabold">Ubah produk</h1>
-      <FormProduk produk={produk} aksi={aksiUbah} labelTombol="Simpan perubahan" />
+      <FormProduk
+        produk={produk}
+        aksi={aksiUbah}
+        labelTombol="Simpan perubahan"
+        daftarKategori={daftarKategori}
+      />
     </div>
   );
 }

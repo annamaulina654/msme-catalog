@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { headers } from "next/headers";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import DaftarkanSw from "@/components/DaftarkanSw";
 import { toko } from "@/lib/toko";
 import { urlSitus } from "@/lib/situs";
 
@@ -22,6 +23,11 @@ export const metadata = {
     locale: "id_ID",
     type: "website",
   },
+};
+
+// US-13: warna bilah alamat di HP mengikuti warna utama toko.
+export const viewport = {
+  themeColor: "#1f6b4f",
 };
 
 export default async function RootLayout({ children }) {
@@ -47,6 +53,7 @@ export default async function RootLayout({ children }) {
         <Header />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4">{children}</main>
         <Footer />
+        <DaftarkanSw />
       </body>
     </html>
   );

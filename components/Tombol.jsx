@@ -6,8 +6,17 @@ const gaya = {
   bahaya: "border border-garis bg-latar text-bahaya hover:border-bahaya",
 };
 
-export default function Tombol({ href, varian = "utama", className = "", children, ...props }) {
+// `unduh` mengubah tautan menjadi unduhan file biasa (tanpa prefetch Next.js), dipakai untuk ekspor CSV.
+export default function Tombol({ href, unduh = false, varian = "utama", className = "", children, ...props }) {
   const kelas = `inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${gaya[varian]} ${className}`;
+
+  if (href && unduh) {
+    return (
+      <a href={href} download className={kelas}>
+        {children}
+      </a>
+    );
+  }
 
   if (href) {
     return (

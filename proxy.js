@@ -20,6 +20,9 @@ function buatCsp(nonce) {
     "img-src 'self' data: blob: https:",
     // Browser hanya boleh menghubungi server sendiri, tidak boleh ke supabase.co.
     "connect-src 'self'",
+    // US-13: service worker dan manifest PWA berasal dari server sendiri.
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -108,7 +111,7 @@ export const config = {
   matcher: [
     {
       // Semua halaman, kecuali file statis dan permintaan prefetch.
-      source: "/((?!_next/static|_next/image|favicon.ico|produk/.*\\.svg|icons/).*)",
+      source: "/((?!_next/static|_next/image|favicon.ico|produk/.*\\.svg|icons/|foto/|sw.js|tema.js).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

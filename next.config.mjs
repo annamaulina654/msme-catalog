@@ -28,11 +28,25 @@ const nextConfig = {
   // Jangan beri tahu dunia luar bahwa situs ini memakai Next.js.
   poweredByHeader: false,
 
+  // US-29 dan US-46: form boleh mengirim file (foto produk, CSV). Batas isi permintaan di Vercel
+  // sekitar 4,5 MB, jadi batas di sini sengaja di bawahnya.
+  experimental: {
+    serverActions: { bodySizeLimit: "4mb" },
+  },
+
   async headers() {
     return [
       {
         source: "/:path*",
         headers: headerKeamanan,
+      },
+      {
+        // US-13: service worker harus selalu diambil versi terbaru.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
       },
       {
         // K-8: halaman admin tidak boleh masuk hasil pencarian.
